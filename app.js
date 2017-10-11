@@ -26,7 +26,7 @@ app.get('/', function(req, res){
 server.listen(serverPort, function(){
   console.log('server up and running at %s port', serverPort);
   if (process.env.LOCAL) {
-    open('https://localhost:' + serverPort)
+    open('https://192.168.0.7:' + serverPort)
   }
 });
 
@@ -54,7 +54,7 @@ io.on('connection', function(socket){
     }
   });
 
-  socket.on('join', function(name, callback){
+  socket.on('join', function(name, callback) {
     console.log('join', name);
     var socketIds = socketIdsInRoom(name);
     callback(socketIds);
@@ -64,9 +64,10 @@ io.on('connection', function(socket){
 
 
   socket.on('exchange', function(data){
-    console.log('exchange', data);
+    console.log('exchange received', data);
     data.from = socket.id;
     var to = io.sockets.connected[data.to];
+    var from = io.sockets.connected[data.from];
     to.emit('exchange', data);
   });
 });
