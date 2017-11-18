@@ -2,10 +2,17 @@ var express = require('express');
 var app = express();
 var fs = require('fs');
 var open = require('open');
+var bodyParser = require('body-parser');
+var Storage = require('node-storage');
+
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
+
 var options = {
   key: fs.readFileSync('./fake-keys/privatekey.pem'),
   cert: fs.readFileSync('./fake-keys/certificate.pem')
 };
+var store = new Storage('./peers.db')
 var serverPort = (process.env.PORT  || 4443);
 var https = require('https');
 var http = require('http');
@@ -19,15 +26,17 @@ var io = require('socket.io')(server);
 
 var roomList = {};
 
-app.get('/', function(req, res){
-  console.log('get /');
-  res.sendFile(__dirname + '/index.html');
+app.post('/api/setUser', function(req, res, next) {
+    console.log('POST /api/setUser', req.body);
+    res.json({ some: 'json' });
+    next();
 });
-server.listen(serverPort, function(){
-  console.log('server up and running at %s port', serverPort);
-  if (process.env.LOCAL) {
-    open('https://192.168.0.7:' + serverPort)
-  }
+
+server.listen(serverPort, function() {
+    console.log('server up and running at %s port', serverPort);
+    /*if (process.env.LOCAL) {
+        open('https://192.168.0.7:' + serverPort)
+    }*/
 });
 
 function socketIdsInRoom(name) {
@@ -43,9 +52,9 @@ function socketIdsInRoom(name) {
   }
 }
 
-io.on('connection', function(socket){
+io.on('connection', function(socket) {
   console.log('connection');
-  socket.on('disconnect', function(){
+  socket.on('disconnect', function() {
     console.log('disconnect');
     if (socket.room) {
       var room = socket.room;
@@ -59,7 +68,9 @@ io.on('connection', function(socket){
     var socketIds = socketIdsInRoom(name);
     callback(socketIds);
     socket.join(name);
+
     socket.room = name;
+    io.to(socket.room).emit('new_member', socket.id);
   });
 
 
@@ -69,5 +80,18 @@ io.on('connection', function(socket){
     var to = io.sockets.connected[data.to];
     var from = io.sockets.connected[data.from];
     to.emit('exchange', data);
+  });
+
+  socket.on('setUser', function(req, callback) {
+    const socketId = req.socketId;
+    const deviceId = req.device_id;
+    const userName = req.username;
+    console.log('set user', userName);
+    store.put(socketId, {userName, deviceId})
+  });
+  socket.on('getUser', function(socket_id, callback) {
+    console.log('finsing user using socketid', socket_id);
+    // find userInfo using socketid
+    store.get(socket_id)
   });
 });
